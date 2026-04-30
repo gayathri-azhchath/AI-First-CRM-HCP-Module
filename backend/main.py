@@ -1,0 +1,107 @@
+import os
+import json
+from typing import Dict, Any
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from agent import graph
+
+# --- Database Imports ---
+from sqlalchemy import create_engine, Column, Integer, String, Text
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ==========================================
+# DATABASE SETUP
+# ==========================================
+# Defaulting to SQLite for easy local testing. 
+# TO USE POSTGRES CHANGE THIS LINE TO: 
+# SQLALCHEMY_DATABASE_URL = "postgresql://username:password@localhost/dbname"
+# TO USE MYSQL CHANGE THIS LINE TO:
+# SQLALCHEMY_DATABASE_URL = "mysql+pymysql://username:password@localhost/dbname"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./crm.db"
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# --- Database Model ---
+class InteractionRecord(Base):
+    __tablename__ = "interactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    hcp_name = Column(String, index=True)
+    interaction_type = Column(String)
+    date = Column(String)
+    time = Column(String)
+    attendees = Column(String)
+    topics = Column(Text)
+    materials = Column(Text)  # Stored as JSON string
+    samples = Column(Text)    # Stored as JSON string
+    sentiment = Column(String)
+    outcomes = Column(Text)
+    follow_ups = Column(Text)
+
+# Create the table in the database
+Base.metadata.create_all(bind=engine)
+
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# ==========================================
+# API ENDPOINTS
+# ==========================================
+
+class ChatRequest(BaseModel):
+    message: str
+    state: Dict[str, Any]
+
+@app.post("/chat")
+async def chat_endpoint(req: ChatRequest):
+    initial_state = {
+        "messages": [("user", req.message)],
+        "form_data": req.state
+    }
+    final_state = graph.invoke(initial_state)
+    return {
+        "ai_message": final_state["messages"][-1].content,
+        "updated_form": final_state["form_data"]
+    }
+
+# --- NEW: Save to Database Endpoint ---
+@app.post("/save")
+async def save_interaction(state: Dict[str, Any], db: Session = Depends(get_db)):
+    try:
+        new_record = InteractionRecord(
+            hcp_name=state.get("hcp_name"),
+            interaction_type=state.get("interaction_type"),
+            date=state.get("date"),
+            time=state.get("time"),
+            attendees=state.get("attendees"),
+            topics=state.get("topics"),
+            materials=json.dumps(state.get("materials", [])),
+            samples=json.dumps(state.get("samples", [])),
+            sentiment=state.get("sentiment"),
+            outcomes=state.get("outcomes"),
+            follow_ups=state.get("follow_ups")
+        )
+        db.add(new_record)
+        db.commit()
+        db.refresh(new_record)
+        return {"status": "success", "message": f"Interaction saved with ID {new_record.id}"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
