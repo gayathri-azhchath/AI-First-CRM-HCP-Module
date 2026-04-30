@@ -159,10 +159,20 @@ def apply_tool_updates(state: AgentState):
                     content=f"SUCCESS: Field '{field}' updated to '{val}'"
                 ))
             else:
+                if tool_name == 'get_hcp_history':
+                    result = get_hcp_history.invoke(args)
+                elif tool_name == 'schedule_followup':
+                    result = schedule_followup.invoke(args)
+                elif tool_name == 'check_compliance':
+                    result = check_compliance.invoke(args)
+                else:
+                    result = "SUCCESS: Unknown tool executed."
+                
+                # Pass the actual result from the tool back to the AI
                 tool_messages.append(ToolMessage(
                     tool_call_id=tool_call['id'], 
                     name=tool_name, 
-                    content="SUCCESS: Tool executed."
+                    content=str(result)
                 ))
                 
     return {"form_data": new_form, "messages": tool_messages}
