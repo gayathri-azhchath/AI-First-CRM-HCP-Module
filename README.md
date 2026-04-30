@@ -52,6 +52,7 @@ source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
 
 # Install dependencies
 pip install fastapi uvicorn langgraph langchain-groq pydantic python-dotenv sqlalchemy
+```
 
 **Set your Groq API Key:**
 Create a `.env` file in the `backend/` directory and add your key:
