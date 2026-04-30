@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional, TypedDict, Annotated, List, Union
+from backend.main import FollowUpRecord
 from langchain_groq import ChatGroq
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage, SystemMessage
 from langchain_core.tools import tool
@@ -6,6 +7,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 import json
 from dotenv import load_dotenv
+from database import SessionLocal, InteractionRecord
 
 load_dotenv()
 
@@ -81,20 +83,80 @@ def edit_interaction(field_name: str, new_value: Any):
 @tool
 def get_hcp_history(hcp_name: str):
     """
-    Retrieves previous meeting notes, specialty, and prescribing history for a specific HCP.
+    Retrieves previous meeting notes, sentiment, and topics for a specific HCP from the database.
     Trigger this if the user asks for background context on the doctor before logging.
     """
-    # In a real app, this would query Postgres. For now, mock it:
-    return f"DB_RESULT: Last meeting with {hcp_name} was 2 weeks ago regarding OncoBoost. Sentiment was Neutral. Specialty: Oncology."
+    # Open a local database session
+    db = SessionLocal()
+    try:
+        # Query the DB for the most recent 3 interactions with this HCP
+        # ilike() is used for case-insensitive matching
+        history = db.query(InteractionRecord).filter(
+            InteractionRecord.hcp_name.ilike(f"%{hcp_name}%")
+        ).order_by(InteractionRecord.id.desc()).limit(3).all()
+        
+        if not history:
+            return f"No previous interaction history found in the database for {hcp_name}."
+        
+        # Format the SQL results into a readable string for Llama 3.3 to summarize
+        result_str = f"Found {len(history)} recent interactions for {hcp_name}:\n"
+        for record in history:
+            result_str += f"- Date: {record.date} | Type: {record.interaction_type} | Sentiment: {record.sentiment}\n"
+            result_str += f"  Topics: {record.topics}\n"
+            result_str += f"  Outcomes: {record.outcomes}\n"
+        
+        return result_str
+        
+    except Exception as e:
+        return f"Error accessing database: {str(e)}"
+    finally:
+        # Always close the connection
+        db.close()
 
 @tool
-def schedule_followup(task_name: str, date: str):
+def schedule_followup(hcp_name: str, task_name: str, date: str):
     """
-    Schedules a follow-up task or calendar event in the CRM system.
+    Schedules a follow-up task or calendar event for a specific HCP in the database.
     Format the date as YYYY-MM-DD.
     """
-    return f"SUCCESS: Task '{task_name}' officially scheduled for {date} in the rep's calendar."
+    db = SessionLocal()
+    try:
+        new_task = FollowUpRecord(hcp_name=hcp_name, task_name=task_name, date=date)
+        db.add(new_task)
+        db.commit()
+        return f"SUCCESS: Task '{task_name}' for {hcp_name} officially scheduled for {date} in the database."
+    except Exception as e:
+        db.rollback()
+        return f"ERROR: Failed to save task to database: {str(e)}"
+    finally:
+        db.close()
 
+@tool
+def get_hcp_followups(hcp_name: str):
+    """
+    Retrieves all scheduled follow-up tasks for a specific HCP from the database.
+    Trigger this if the user asks what tasks or follow-ups are coming up for a doctor.
+    """
+    db = SessionLocal()
+    try:
+        # Query the DB for tasks matching this HCP, ordered by date
+        tasks = db.query(FollowUpRecord).filter(
+            FollowUpRecord.hcp_name.ilike(f"%{hcp_name}%")
+        ).order_by(FollowUpRecord.date.asc()).all()
+        
+        if not tasks:
+            return f"No pending follow-ups found for {hcp_name}."
+        
+        result_str = f"Found {len(tasks)} upcoming follow-up(s) for {hcp_name}:\n"
+        for t in tasks:
+            result_str += f"- [{t.date}] {t.task_name} (Status: {t.status})\n"
+            
+        return result_str
+    except Exception as e:
+        return f"ERROR retrieving follow-ups: {str(e)}"
+    finally:
+        db.close()
+        
 @tool
 def check_compliance(interaction_summary: str):
     """

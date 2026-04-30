@@ -1,14 +1,11 @@
 import os
 import json
 from typing import Dict, Any
+from backend.database import InteractionRecord, SessionLocal
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from agent import graph
-
-# --- Database Imports ---
-from sqlalchemy import create_engine, Column, Integer, String, Text
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 app = FastAPI()
 
@@ -19,55 +16,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ==========================================
-# DATABASE SETUP
-# ==========================================
-# Defaulting to SQLite for easy local testing. 
-# TO USE POSTGRES CHANGE THIS LINE TO: 
-# SQLALCHEMY_DATABASE_URL = "postgresql://username:password@localhost/dbname"
-# TO USE MYSQL CHANGE THIS LINE TO:
-# SQLALCHEMY_DATABASE_URL = "mysql+pymysql://username:password@localhost/dbname"
-SQLALCHEMY_DATABASE_URL = "sqlite:///./crm.db"
+class ChatRequest(BaseModel):
+    message: str
+    state: Dict[str, Any]
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# --- Database Model ---
-class InteractionRecord(Base):
-    __tablename__ = "interactions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    hcp_name = Column(String, index=True)
-    interaction_type = Column(String)
-    date = Column(String)
-    time = Column(String)
-    attendees = Column(String)
-    topics = Column(Text)
-    materials = Column(Text)  # Stored as JSON string
-    samples = Column(Text)    # Stored as JSON string
-    sentiment = Column(String)
-    outcomes = Column(Text)
-    follow_ups = Column(Text)
-
-# Create the table in the database
-Base.metadata.create_all(bind=engine)
-
-# Dependency to get DB session
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-# ==========================================
-# API ENDPOINTS
-# ==========================================
-
-class ChatRequest(BaseModel):
-    message: str
-    state: Dict[str, Any]
 
 @app.post("/chat")
 async def chat_endpoint(req: ChatRequest):
