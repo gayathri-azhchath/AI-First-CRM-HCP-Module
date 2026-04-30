@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setFormField, syncState, addMessage } from './store';
-import axios from 'axios';
+import { setFormField, syncState, addMessage, resetForm } from './store';import axios from 'axios';
 import './App.css';
 
 export default function App() {
@@ -39,8 +38,15 @@ export default function App() {
       const res = await axios.post('http://localhost:8000/save', state);
       alert(`✅ ${res.data.message}`);
       
-      // Tell the AI it was saved successfully
-      dispatch(addMessage({ role: 'ai', text: 'Form data successfully saved to the database.' }));
+      // NEW: Wipe the Redux state clean
+      dispatch(resetForm());
+      
+      // Tell the AI it was saved successfully (this starts a fresh chat)
+      dispatch(addMessage({ 
+        role: 'ai', 
+        text: 'Interaction saved successfully! The form has been cleared. Ready to log your next interaction.' 
+      }));
+      
     } catch (error) {
       console.error("Save Error:", error);
       alert("❌ Failed to save to database. Make sure the backend is running.");
@@ -220,7 +226,7 @@ export default function App() {
             onMouseOver={(e) => e.target.style.background = '#1d4ed8'}
             onMouseOut={(e) => e.target.style.background = '#2563eb'}
           >
-            💾 Save Interaction to Database
+            💾 Save Interaction
           </button>
         </div>
 
