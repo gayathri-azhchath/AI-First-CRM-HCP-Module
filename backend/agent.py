@@ -24,8 +24,8 @@ def log_interaction(
     time: Optional[str] = None,
     attendees: Optional[str] = None,
     topics: Optional[str] = None,
-    materials: Optional[List[str]] = None,
-    samples: Optional[List[str]] = None,
+    materials: Optional[Union[List[str],str]] = None,
+    samples: Optional[Union[List[str],str]] = None,
     sentiment: Optional[str] = None,
     outcomes: Optional[str] = None,
     follow_ups: Optional[str] = None
@@ -36,6 +36,11 @@ def log_interaction(
     - interaction_type MUST be exactly one of: 'Meeting', 'Email', 'Phone Call', 'Event'.
     - sentiment MUST be exactly one of: 'Positive', 'Neutral', 'Negative'.
     """
+
+    if isinstance(materials, str):
+        materials = [materials]
+    if isinstance(samples, str):
+        samples = [samples]
     # Capture all provided arguments, filtering out None values
     updates = {
         "hcp_name": hcp_name,
@@ -99,7 +104,7 @@ def check_compliance(interaction_summary: str):
     return "COMPLIANCE_STATUS: Passed. No off-label claims or prohibited gift values detected in the summary."
 
 tools = [log_interaction, edit_interaction, get_hcp_history, schedule_followup, check_compliance]
-llm = ChatGroq(model="gemma2-9b-it", temperature=0) # As specified in requirements
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0) # As specified in requirements
 llm_with_tools = llm.bind_tools(tools)
 
 # Node logic

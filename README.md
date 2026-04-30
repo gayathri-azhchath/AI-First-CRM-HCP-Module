@@ -16,7 +16,7 @@ It features a dual-interface design where field representatives can log interact
 *   **Python + FastAPI**: High-performance asynchronous API.
 *   **Uvicorn**: ASGI web server.
 *   **LangGraph**: State-based orchestration for the AI agent to handle complex, multi-step tool execution safely.
-*   **Groq API**: Utilizing the ultra-fast `gemma2-9b-it` LLM.
+*   **Groq API**: Utilizing the ultra-fast `llama-3.3-70b-versatile` LLM.
 *   **SQLAlchemy**: ORM for database persistence (configured with SQLite for instant local setup, easily swappable to PostgreSQL/MySQL).
 
 ---
