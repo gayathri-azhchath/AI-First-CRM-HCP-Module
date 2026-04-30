@@ -66,10 +66,14 @@ export default function App() {
                 onChange={(e) => dispatch(setFormField({field: 'hcp_name', value: e.target.value}))}
               />
             </div>
+            
             <div className="input-group">
               <label>Interaction Type</label>
               <select 
-                value={state.interaction_type || 'Meeting'}
+                // Case-insensitive match, fallback to Meeting
+                value={['Meeting', 'Email', 'Phone Call', 'Event'].find(
+                  t => t.toLowerCase() === (state.interaction_type || 'Meeting').toLowerCase()
+                ) || 'Meeting'}
                 onChange={(e) => dispatch(setFormField({field: 'interaction_type', value: e.target.value}))}
               >
                 <option>Meeting</option>
@@ -78,6 +82,7 @@ export default function App() {
                 <option>Event</option>
               </select>
             </div>
+            
             <div className="input-group">
               <label>Date</label>
               <input 
@@ -86,6 +91,7 @@ export default function App() {
                 onChange={(e) => dispatch(setFormField({field: 'date', value: e.target.value}))}
               />
             </div>
+            
             <div className="input-group">
               <label>Time</label>
               <input 
@@ -125,19 +131,35 @@ export default function App() {
 
         <div className="form-section">
           <h4 className="section-header">Materials Shared / Samples Distributed</h4>
+          
+          {/* Dynamic Materials List */}
           <div className="asset-box">
             <div className="asset-header">
               <span>Materials Shared</span>
               <button className="btn-outline">🔍 Search/Add</button>
             </div>
-            <p className="empty-text">No materials added.</p>
+            {state.materials && state.materials.length > 0 ? (
+              <ul style={{ margin: '10px 0 0 20px', padding: 0, fontSize: '0.85rem', color: '#1f2937' }}>
+                {state.materials.map((m, i) => <li key={i}>{m}</li>)}
+              </ul>
+            ) : (
+              <p className="empty-text">No materials added.</p>
+            )}
           </div>
+          
+          {/* Dynamic Samples List */}
           <div className="asset-box">
             <div className="asset-header">
               <span>Samples Distributed</span>
               <button className="btn-outline">📦 Add Sample</button>
             </div>
-            <p className="empty-text">No samples added.</p>
+            {state.samples && state.samples.length > 0 ? (
+              <ul style={{ margin: '10px 0 0 20px', padding: 0, fontSize: '0.85rem', color: '#1f2937' }}>
+                {state.samples.map((s, i) => <li key={i}>{s}</li>)}
+              </ul>
+            ) : (
+              <p className="empty-text">No samples added.</p>
+            )}
           </div>
         </div>
 
@@ -149,7 +171,8 @@ export default function App() {
                 <input 
                   type="radio" 
                   name="sentiment" 
-                  checked={state.sentiment === s}
+                  // Case-insensitive match for the radio buttons
+                  checked={(state.sentiment || '').toLowerCase() === s.toLowerCase()}
                   onChange={() => dispatch(setFormField({field: 'sentiment', value: s}))}
                 />
                 {s === 'Positive' ? '😀' : s === 'Neutral' ? '😐' : '😞'} {s}
@@ -197,7 +220,7 @@ export default function App() {
             onMouseOver={(e) => e.target.style.background = '#1d4ed8'}
             onMouseOut={(e) => e.target.style.background = '#2563eb'}
           >
-            💾 Submit
+            💾 Save Interaction to Database
           </button>
         </div>
 

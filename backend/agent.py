@@ -33,6 +33,8 @@ def log_interaction(
     """
     Extracts and logs HCP interaction details. 
     Only extracts fields that are explicitly mentioned or clearly inferred from the text.
+    - interaction_type MUST be exactly one of: 'Meeting', 'Email', 'Phone Call', 'Event'.
+    - sentiment MUST be exactly one of: 'Positive', 'Neutral', 'Negative'.
     """
     # Capture all provided arguments, filtering out None values
     updates = {
