@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional, TypedDict, Annotated, List, Union
 from langchain_groq import ChatGroq
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage, SystemMessage
 from langchain_core.tools import tool
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
@@ -127,7 +127,7 @@ def call_model(state: AgentState):
 def apply_tool_updates(state: AgentState):
     last_msg = state['messages'][-1]
     new_form = state['form_data'].copy()
-    tool_messages = [] # We need to store what the tools did to tell the AI
+    tool_messages = [] 
     
     if hasattr(last_msg, 'tool_calls') and last_msg.tool_calls:
         for tool_call in last_msg.tool_calls:
@@ -140,7 +140,6 @@ def apply_tool_updates(state: AgentState):
                     if value: 
                         new_form[key] = value
                 
-                # Report back to the AI so it can formulate a response
                 tool_messages.append(ToolMessage(
                     tool_call_id=tool_call['id'], 
                     name=tool_name, 
@@ -154,49 +153,42 @@ def apply_tool_updates(state: AgentState):
                 if field in new_form:
                     new_form[field] = val
                 
-                # Report back to the AI
                 tool_messages.append(ToolMessage(
                     tool_call_id=tool_call['id'], 
                     name=tool_name, 
                     content=f"SUCCESS: Field '{field}' updated to '{val}'"
                 ))
             else:
-                # Catch-all for other tools like get_hcp_history
                 tool_messages.append(ToolMessage(
                     tool_call_id=tool_call['id'], 
                     name=tool_name, 
                     content="SUCCESS: Tool executed."
                 ))
                 
-    # Return both the updated form and the tool messages for the AI to read
     return {"form_data": new_form, "messages": tool_messages}
 
-# --- NEW: Routing Logic ---
-def should_continue(state: AgentState):
-    """Determines if the AI called a tool, or if it is just chatting."""
-    last_msg = state['messages'][-1]
-    # If the AI decided to call a tool, route to the 'sync' node
-    if hasattr(last_msg, 'tool_calls') and last_msg.tool_calls:
-        return "sync"
-    # Otherwise, it has finished formulating its text reply, so end the graph
-    return END
+# --- NEW: Third Node for the Final Reply ---
+def generate_final_reply(state: AgentState):
+    """
+    This node uses the base LLM (WITHOUT tools) to ensure it only 
+    generates a conversational text reply and doesn't try to extract data again.
+    """
+    response = llm.invoke(state['messages'])
+    return {"messages": [response]}
 
-# Define Graph
+
+# --- Define the Strictly Linear Graph ---
 workflow = StateGraph(AgentState)
 
-workflow.add_node("agent", call_model)
-workflow.add_node("sync", apply_tool_updates)
+workflow.add_node("agent", call_model)               # Step 1: Assume form update & extract
+workflow.add_node("sync", apply_tool_updates)        # Step 2: Apply to Redux state
+workflow.add_node("reply", generate_final_reply)     # Step 3: Speak back to the user
 
 workflow.set_entry_point("agent")
 
-# 1. From the agent, either run tools, or end the conversation
-workflow.add_conditional_edges(
-    "agent", 
-    should_continue, 
-    {"sync": "sync", END: END}
-)
-
-# 2. CRITICAL FIX: After syncing the form, loop BACK to the agent so it can speak!
-workflow.add_edge("sync", "agent")
+# No conditional edges needed! It runs straight through.
+workflow.add_edge("agent", "sync")
+workflow.add_edge("sync", "reply")
+workflow.add_edge("reply", END)
 
 graph = workflow.compile()
