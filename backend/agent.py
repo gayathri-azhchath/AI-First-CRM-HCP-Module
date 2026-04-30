@@ -165,8 +165,8 @@ def check_compliance(interaction_summary: str):
     """
     return "COMPLIANCE_STATUS: Passed. No off-label claims or prohibited gift values detected in the summary."
 
-tools = [log_interaction, edit_interaction, get_hcp_history, schedule_followup, check_compliance]
-llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0) # As specified in requirements
+tools = [log_interaction, edit_interaction, get_hcp_history, schedule_followup, check_compliance, get_hcp_followups]
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 llm_with_tools = llm.bind_tools(tools)
 
 # Node logic
@@ -221,12 +221,15 @@ def apply_tool_updates(state: AgentState):
                     content=f"SUCCESS: Field '{field}' updated to '{val}'"
                 ))
             else:
+                # Execute the utility tools!
                 if tool_name == 'get_hcp_history':
                     result = get_hcp_history.invoke(args)
                 elif tool_name == 'schedule_followup':
                     result = schedule_followup.invoke(args)
                 elif tool_name == 'check_compliance':
                     result = check_compliance.invoke(args)
+                elif tool_name == 'get_hcp_followups':
+                    result = get_hcp_followups.invoke(args)
                 else:
                     result = "SUCCESS: Unknown tool executed."
                 
