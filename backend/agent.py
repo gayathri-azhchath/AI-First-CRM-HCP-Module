@@ -1,5 +1,4 @@
 from typing import Any, Dict, Optional, TypedDict, Annotated, List, Union
-from backend.main import FollowUpRecord
 from langchain_groq import ChatGroq
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage, SystemMessage
 from langchain_core.tools import tool
@@ -7,7 +6,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 import json
 from dotenv import load_dotenv
-from database import SessionLocal, InteractionRecord
+from database import FollowUpRecord, SessionLocal, InteractionRecord
 
 load_dotenv()
 

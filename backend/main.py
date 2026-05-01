@@ -1,7 +1,7 @@
 import os
 import json
 from typing import Dict, Any
-from backend.database import InteractionRecord, SessionLocal
+from database import InteractionRecord, SessionLocal
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -41,7 +41,7 @@ async def chat_endpoint(req: ChatRequest):
 
 # --- NEW: Save to Database Endpoint ---
 @app.post("/save")
-async def save_interaction(state: Dict[str, Any], db: Session = Depends(get_db)):
+async def save_interaction(state: Dict[str, Any], db = Depends(get_db)):
     try:
         new_record = InteractionRecord(
             hcp_name=state.get("hcp_name"),
